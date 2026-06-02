@@ -1,23 +1,40 @@
-# Use lightweight Node.js 20 Alpine image
-FROM node:20-alpine
 
-# Set working directory
+FROM node:20-alpine AS builder
+
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
+
 COPY package*.json ./
 
-# Install dependencies (only production for smaller size)
-RUN npm install --omit=dev
 
-# Copy the rest of the application source code
+RUN npm ci --omit=dev --ignore-scripts
+
 COPY . .
 
-# Expose the API port
+
+FROM gcr.io/distroless/nodejs20-debian12 AS runner
+
+
+WORKDIR /usr/src/app
+
+
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+
+
+COPY --from=builder /usr/src/app/server.js ./server.js
+COPY --from=builder /usr/src/app/src ./src
+
+
+USER nonroot:nonroot
+
 EXPOSE 5000
 
-# Set environment to production
-ENV NODE_ENV=production
+ENV NODE_NODE=production \
+    PORT=5000
 
-# Start the application
-CMD ["node", "server.js"]
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5000/healthz', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+
+
+CMD ["server.js"]
