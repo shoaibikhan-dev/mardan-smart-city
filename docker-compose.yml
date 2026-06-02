@@ -1,3 +1,4 @@
+
 version: '3.8'
 
 services:
@@ -6,21 +7,18 @@ services:
     container_name: mardan-postgres
     restart: always
     environment:
-      POSTGRES_DB: mardan_smart_city
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mardan_password_123
+      POSTGRES_DB: desc_portal
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: StrongPass123!@#
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mardan_smart_city"]
+      test: ["CMD-SHELL", "pg_isready -U portal_user -d desc_portal"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - mardan-network
 
   redis:
     image: redis:7-alpine
@@ -28,42 +26,40 @@ services:
     restart: always
     ports:
       - "6379:6379"
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 2gb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - mardan-network
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: builder
     container_name: mardan-backend
     restart: always
     ports:
       - "5000:5000"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 5000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: mardan_smart_city
-      DB_USER: postgres
-      DB_PASSWORD: mardan_password_123
-      JWT_SECRET: mardan_smart_city_super_secret_jwt_key_2024
-      JWT_EXPIRE: 7d
-      REDIS_URL: redis://redis:6379
-      CLIENT_URL: http://localhost:3000
+      DB_NAME: desc_portal
+      DB_USER: portal_user
+      DB_PASSWORD: StrongPass123!@#
+      JWT_SECRET: your-256-bit-secret-key-here-min-32-chars-long
+      REFRESH_TOKEN_SECRET: another-256-bit-refresh-secret-key-here
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GEMINI_API_KEY: AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - mardan-network
 
   frontend:
     build:
@@ -72,16 +68,11 @@ services:
     container_name: mardan-frontend
     restart: always
     ports:
-      - "3000:80"
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
     depends_on:
       - backend
-    networks:
-      - mardan-network
 
 volumes:
   pgdata:
-    driver: local
-
-networks:
-  mardan-network:
-    driver: bridge
