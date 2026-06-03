@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: awaisbacha55/mardan-backend:latest
+          image: shoaibikhandev/mardan-backend
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
